@@ -2,8 +2,8 @@ name: 百度贴吧自动签到
 
 on:
   schedule:
-    - cron: '0 2,3 * * *'  # 每天 UTC 2:00 3:00 运行 (北京时间 10:00 11:00)
-  workflow_dispatch:     # 支持手动触发
+    - cron: '0 0 * * *'  # 每天 UTC 00:00 = 北京时间早上 08:00
+  workflow_dispatch:  # 保留这个，手动触发测试用（如果原本有就别删）
 
 jobs:
   signin:
