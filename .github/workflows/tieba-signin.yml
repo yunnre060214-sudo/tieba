@@ -53,3 +53,24 @@ jobs:
         run: |
           echo "当前时间: $(date "+%Y/%m/%d %H:%M:%S")"
           echo "工作流执行状态: ${{ job.status }}" 
+
+      - name: Send email on success
+        if: success()  # 只在签到全部成功时发邮件
+        uses: dawidd6/action-send-mail@v9
+        with:
+          server_address: smtp.qq.com  # QQ SMTP 服务器
+          server_port: 465  # 推荐 465 (SSL)，稳；如果连接失败可改 587
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: 百度贴吧签到完成！  # 邮件标题，可自定义
+          to: ${{ secrets.MAIL_TO }}  # 接收邮箱（建议 Secrets 里加 MAIL_TO）
+          from: Tieba Auto Sign <${{ secrets.MAIL_USERNAME }}>  # 发件人显示（带邮箱更好防进垃圾箱）
+          body: |
+            签到任务已完成！
+            时间: ${{ github.event.schedule || '手动触发' }} (北京时间)
+            仓库: ${{ github.repository }}
+            运行 ID: ${{ github.run_id }}
+            详情链接: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          secure: true  # 启用 SSL/TLS（端口 465 时必须）
+          # 可选：如果想发 HTML 格式，用 html_body 替换 body，并写 <html> 内容
+          # html_body: "<h1>签到成功！</h1><p>详情见链接...</p>"
