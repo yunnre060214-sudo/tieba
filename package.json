@@ -1,17 +1,19 @@
 {
   "name": "tieba",
-  "version": "1.0.0",
-  "description": "百度贴吧自动签到 GitHub Actions 脚本",
+  "version": "2.0.0",
+  "description": "可靠的百度贴吧单账号自动签到工具",
   "main": "dist/index.js",
   "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "build": "tsc",
-    "start": "npm run build && node dist/index.js",
-    "test": "npm run build && node dist/local-test.js",
-    "dev": "ts-node src/index.ts"
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "check": "npm run typecheck && npm test && npm run build"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chiupam/tieba.git"
+    "url": "git+https://github.com/yunnre060214-sudo/tieba.git"
   },
   "keywords": [
     "github-actions",
@@ -20,19 +22,25 @@
     "tieba",
     "sign-in"
   ],
-  "author": "chiupam",
+  "author": "yunnre",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/chiupam/tieba/issues"
+    "url": "https://github.com/yunnre060214-sudo/tieba/issues"
   },
-  "homepage": "https://github.com/chiupam/tieba#readme",
+  "homepage": "https://github.com/yunnre060214-sudo/tieba#readme",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
-    "axios": "^1.6.0"
+    "axios": "1.18.1",
+    "dotenv": "17.4.2",
+    "nodemailer": "9.0.3"
   },
   "devDependencies": {
-    "@types/node": "^20.12.0",
-    "dotenv": "^16.4.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.4.2"
+    "@types/node": "26.1.1",
+    "@types/nodemailer": "8.0.1",
+    "tsx": "4.23.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
   }
 }

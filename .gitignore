@@ -36,7 +36,7 @@ yarn-error.log*
 lerna-debug.log*
 
 # 构建和输出目录
-# dist/ (由build.yml工作流自动构建并提交)
+dist/
 build/
 out/
 output/
@@ -65,4 +65,4 @@ $RECYCLE.BIN/
 .parcel-cache
 
 # TypeScript build output
-*.tsbuildinfo 
+*.tsbuildinfo
