@@ -108,6 +108,18 @@ describe('AxiosTiebaClient', () => {
     await expect(client.login()).rejects.toMatchObject({ kind: 'auth' });
   });
 
+  it('treats a missing like_forum field as an empty forum list', async () => {
+    const transport = new RecordingTransport(request => {
+      if (request.url.endsWith('/mo/q/newmoindex')) {
+        return { status: 200, data: { error: 'success', data: {} } };
+      }
+      return successResponse(request);
+    });
+    const client = new AxiosTiebaClient('secret-bduss', 10000, transport);
+
+    await expect(client.listForums()).resolves.toEqual([]);
+  });
+
   it.each([
     [1101, 'already_signed'],
     [1102, 'retryable_failure'],

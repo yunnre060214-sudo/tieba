@@ -1,5 +1,5 @@
 import type { AppConfig } from './config';
-import type { Forum, ForumResult, RunCounts, RunReport } from './domain';
+import type { Forum, ForumResult, RunCounts, RunReport, RunStatus } from './domain';
 import { TiebaError, type TiebaPort, type TiebaSignResult } from './tieba';
 
 export interface RunnerRuntime {
@@ -103,6 +103,19 @@ function countResults(forums: ForumResult[]): RunCounts {
   }, { total: 0, signed: 0, alreadySigned: 0, failed: 0 });
 }
 
+function determineStatus(counts: RunCounts, fatalReason?: string): RunStatus {
+  if (fatalReason) return 'fatal_failure';
+  if (counts.failed > 0) return 'partial_failure';
+  return 'success';
+}
+
+function orderResults(forums: Forum[], completed: Map<string, ForumResult>): ForumResult[] {
+  return forums.flatMap(forum => {
+    const result = completed.get(forum.name);
+    return result ? [result] : [];
+  });
+}
+
 function finishReport(
   startedAt: Date,
   runtime: RunnerRuntime,
@@ -111,14 +124,9 @@ function finishReport(
 ): RunReport {
   const finishedAt = runtime.now();
   const counts = countResults(forums);
-  const status = fatalReason
-    ? 'fatal_failure'
-    : counts.failed > 0
-      ? 'partial_failure'
-      : 'success';
 
   return {
-    status,
+    status: determineStatus(counts, fatalReason),
     startedAt,
     finishedAt,
     durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
@@ -164,16 +172,13 @@ export async function runSignIn(
       }
     }
 
-    const orderedResults = forums.flatMap(forum => {
-      const result = completed.get(forum.name);
-      return result ? [result] : [];
-    });
-    return finishReport(startedAt, runtime, orderedResults);
+    return finishReport(startedAt, runtime, orderResults(forums, completed));
   } catch (error) {
-    const orderedResults = forums.flatMap(forum => {
-      const result = completed.get(forum.name);
-      return result ? [result] : [];
-    });
-    return finishReport(startedAt, runtime, orderedResults, safeErrorMessage(error));
+    return finishReport(
+      startedAt,
+      runtime,
+      orderResults(forums, completed),
+      safeErrorMessage(error),
+    );
   }
 }

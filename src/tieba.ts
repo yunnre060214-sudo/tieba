@@ -131,9 +131,11 @@ export class AxiosTiebaClient implements TiebaPort {
     });
     const body = asRecord(response.data);
     const data = asRecord(body?.data);
-    const forums = data?.like_forum;
-
-    if (!body || body.error !== 'success' || !Array.isArray(forums)) {
+    if (!body || body.error !== 'success' || !data) {
+      throw new TiebaError('permanent', '贴吧列表响应格式无效');
+    }
+    const forums = data.like_forum ?? [];
+    if (!Array.isArray(forums)) {
       throw new TiebaError('permanent', '贴吧列表响应格式无效');
     }
 
