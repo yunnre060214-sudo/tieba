@@ -2,75 +2,41 @@ name: 百度贴吧自动签到
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 00:00 = 北京时间早上 08:00
-  workflow_dispatch:  # 保留这个，手动触发测试用（如果原本有就别删）
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tieba-signin-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   signin:
     runs-on: ubuntu-latest
-    timeout-minutes: 15   # 设置超时限制
-
-    env:
-      TZ: Asia/Shanghai  # 设置时区为中国标准时间
+    timeout-minutes: 15
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v3
-        
-      - name: 设置 Node.js 环境
-        uses: actions/setup-node@v3
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
-          
+          node-version: '22'
+          cache: npm
+
       - name: 安装依赖
         run: npm ci
-        
-      - name: 运行签到脚本
-        env:
-          # 基础配置
-          BDUSS: ${{ secrets.BDUSS }}
-          BATCH_SIZE: ${{ secrets.BATCH_SIZE || '5' }}
-          BATCH_INTERVAL: ${{ secrets.BATCH_INTERVAL || '1000' }}
-          
-          # 重试配置
-          MAX_RETRIES: ${{ secrets.MAX_RETRIES || '3' }}
-          RETRY_INTERVAL: ${{ secrets.RETRY_INTERVAL || '5000' }}
-          
-          # 通知相关环境变量
-          ENABLE_NOTIFY: ${{ secrets.ENABLE_NOTIFY || 'false' }}
-          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
-          BARK_KEY: ${{ secrets.BARK_KEY }}
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
-          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
-          WECOM_KEY: ${{ secrets.WECOM_KEY }}
-          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
-        run: node dist/index.js
-      
-      - name: 处理结果
-        if: always()
-        run: |
-          echo "当前时间: $(date "+%Y/%m/%d %H:%M:%S")"
-          echo "工作流执行状态: ${{ job.status }}" 
 
-      - name: Send email on success
-        if: success()  # 只在签到全部成功时发邮件
-        uses: dawidd6/action-send-mail@v9
-        with:
-          server_address: smtp.qq.com  # QQ SMTP 服务器
-          server_port: 465  # 推荐 465 (SSL)，稳；如果连接失败可改 587
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: 百度贴吧签到完成！  # 邮件标题，可自定义
-          to: ${{ secrets.MAIL_TO }}  # 接收邮箱（建议 Secrets 里加 MAIL_TO）
-          from: Tieba Auto Sign <${{ secrets.MAIL_USERNAME }}>  # 发件人显示（带邮箱更好防进垃圾箱）
-          body: |
-            签到任务已完成！
-            时间: ${{ github.event.schedule || '手动触发' }} (北京时间)
-            仓库: ${{ github.repository }}
-            运行 ID: ${{ github.run_id }}
-            详情链接: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          secure: true  # 启用 SSL/TLS（端口 465 时必须）
-          # 可选：如果想发 HTML 格式，用 html_body 替换 body，并写 <html> 内容
-          # html_body: "<h1>签到成功！</h1><p>详情见链接...</p>"
+      - name: 类型检查、测试与构建
+        run: npm run check
+
+      - name: 运行签到并发送结果邮件
+        env:
+          BDUSS: ${{ secrets.BDUSS }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: npm start
