@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { AxiosRequestConfig } from 'axios';
+import { createHash } from 'node:crypto';
 import type { Forum } from './domain';
 
 export type TiebaErrorKind = 'transient' | 'auth' | 'permanent';
@@ -48,10 +49,12 @@ export interface TiebaPort {
   signForum(forum: Forum, tbs: string): Promise<TiebaSignResult>;
 }
 
+const TIEBA_APP_VERSION = '22.5.1.0';
+const TIEBA_APP_SALT = 'tiebaclient!!!';
+
 const endpoints = {
-  login: 'https://tieba.baidu.com/mo/q/sync',
+  login: 'https://tiebac.baidu.com/c/s/login',
   forums: 'https://tieba.baidu.com/mo/q/newmoindex',
-  tbs: 'https://tieba.baidu.com/dc/common/tbs',
   sign: 'https://tieba.baidu.com/sign/add',
 } as const;
 
@@ -82,6 +85,19 @@ function safeText(value: unknown): string | undefined {
   return typeof value === 'string' && value.length <= 200 ? value : undefined;
 }
 
+function mobileLoginForm(bduss: string): string {
+  const fields: Array<[string, string]> = [
+    ['_client_version', TIEBA_APP_VERSION],
+    ['bdusstoken', bduss],
+  ];
+  const source = [...fields]
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('');
+  const sign = createHash('md5').update(source).update(TIEBA_APP_SALT).digest('hex');
+  return new URLSearchParams([...fields, ['sign', sign]]).toString();
+}
+
 function classifyTransportError(error: unknown): TiebaError {
   if (error instanceof TiebaError) {
     return error;
@@ -105,6 +121,8 @@ function classifyTransportError(error: unknown): TiebaError {
 }
 
 export class AxiosTiebaClient implements TiebaPort {
+  private tbs: string | undefined;
+
   constructor(
     private readonly bduss: string,
     private readonly requestTimeoutMs: number,
@@ -113,14 +131,25 @@ export class AxiosTiebaClient implements TiebaPort {
 
   async login(): Promise<void> {
     const response = await this.request<unknown>({
-      method: 'GET',
+      method: 'POST',
       url: endpoints.login,
-      headers: this.mobileHeaders('https://tieba.baidu.com/home/main'),
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': `tieba/${TIEBA_APP_VERSION}`,
+      },
+      data: mobileLoginForm(this.bduss),
     });
     const body = asRecord(response.data);
-    if (!body || body.no !== 0 || body.error !== 'success') {
+    const errorCode = Number(body?.error_code);
+    if (!body || !Number.isFinite(errorCode) || errorCode !== 0) {
       throw new TiebaError('auth', 'BDUSS 已失效或无法验证');
     }
+    const tbs = safeText(asRecord(body.anti)?.tbs);
+    if (!tbs) {
+      throw new TiebaError('permanent', '贴吧登录响应缺少 TBS');
+    }
+    this.tbs = tbs;
   }
 
   async listForums(): Promise<Forum[]> {
@@ -150,19 +179,10 @@ export class AxiosTiebaClient implements TiebaPort {
   }
 
   async getTbs(): Promise<string> {
-    const response = await this.request<unknown>({
-      method: 'GET',
-      url: endpoints.tbs,
-      headers: this.mobileHeaders('https://tieba.baidu.com/'),
-    });
-    const body = asRecord(response.data);
-    if (body?.is_login === 0) {
-      throw new TiebaError('auth', 'BDUSS 已失效，无法获取 TBS');
+    if (!this.tbs) {
+      throw new TiebaError('permanent', '请先完成贴吧登录再获取 TBS');
     }
-    if (typeof body?.tbs !== 'string' || !body.tbs) {
-      throw new TiebaError('permanent', 'TBS 响应格式无效');
-    }
-    return body.tbs;
+    return this.tbs;
   }
 
   async signForum(forum: Forum, tbs: string): Promise<TiebaSignResult> {
